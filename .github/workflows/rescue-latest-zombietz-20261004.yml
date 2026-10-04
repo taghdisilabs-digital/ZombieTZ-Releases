@@ -1,4 +1,4 @@
-name: Rescue latest ZombieTZ full source and playable
+name: Watch and rescue latest ZombieTZ full source
 
 on:
   push:
@@ -17,17 +17,30 @@ env:
   PLAYABLE: ZombieTZ-Linux-verified-20261004T1620Z.tar.zst
 
 jobs:
-  rescue:
+  watch-rescue:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 30
     steps:
-      - name: Pull exact latest full source
+      - name: Wait up to 10 minutes for emergency origin
+        run: |
+          set -u
+          ok=0
+          for i in $(seq 1 60); do
+            code=$(curl -L -sS -o /dev/null -w '%{http_code}' --connect-timeout 4 --max-time 8 "$BASE_URL/$SOURCE_OVERLAY" || true)
+            echo "probe=$i status=$code"
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 10
+          done
+          [ "$ok" = "1" ] || { echo "origin unavailable for full watch window"; exit 1; }
+
+      - name: Pull and verify exact latest full source
         run: |
           set -euxo pipefail
           curl --fail --location --retry 12 --retry-delay 2 --retry-all-errors --connect-timeout 15 --max-time 3000 -o "$FULL_SOURCE" "$BASE_URL/$FULL_SOURCE"
           echo "$FULL_SOURCE_SHA256  $FULL_SOURCE" | sha256sum -c -
           zstd -t "$FULL_SOURCE"
           sha256sum "$FULL_SOURCE" | tee FULL_SOURCE.sha256
+
       - name: Preserve exact latest full source
         uses: actions/upload-artifact@v4
         with:
@@ -37,13 +50,15 @@ jobs:
             FULL_SOURCE.sha256
           compression-level: 0
           retention-days: 90
-      - name: Pull latest compact source overlay
+
+      - name: Pull and preserve compact current source overlay
         run: |
           set -euxo pipefail
-          curl --fail --location --retry 12 --retry-delay 2 --retry-all-errors --connect-timeout 15 --max-time 600 -o "$SOURCE_OVERLAY" "$BASE_URL/$SOURCE_OVERLAY"
+          curl --fail --location --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 600 -o "$SOURCE_OVERLAY" "$BASE_URL/$SOURCE_OVERLAY"
           zstd -t "$SOURCE_OVERLAY"
           sha256sum "$SOURCE_OVERLAY" | tee SOURCE_OVERLAY.sha256
-      - name: Preserve compact source overlay
+
+      - name: Upload compact source overlay
         uses: actions/upload-artifact@v4
         with:
           name: ZombieTZ-source-verified-20261004T1618Z
@@ -52,13 +67,15 @@ jobs:
             SOURCE_OVERLAY.sha256
           compression-level: 0
           retention-days: 90
-      - name: Pull latest verified playable
+
+      - name: Pull and preserve latest verified playable
         run: |
           set -euxo pipefail
-          curl --fail --location --retry 12 --retry-delay 2 --retry-all-errors --connect-timeout 15 --max-time 2400 -o "$PLAYABLE" "$BASE_URL/$PLAYABLE"
+          curl --fail --location --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 2400 -o "$PLAYABLE" "$BASE_URL/$PLAYABLE"
           zstd -t "$PLAYABLE"
           sha256sum "$PLAYABLE" | tee PLAYABLE.sha256
-      - name: Preserve latest verified playable
+
+      - name: Upload latest verified playable
         uses: actions/upload-artifact@v4
         with:
           name: ZombieTZ-Linux-verified-20261004T1620Z
