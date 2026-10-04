@@ -34,9 +34,10 @@ jobs:
           ls -lah
           test -f "$SOURCE_NAME"
           echo "$SOURCE_SHA256  $SOURCE_NAME" | sha256sum -c -
-          git bundle verify "$SOURCE_NAME"
-          git clone "$SOURCE_NAME" ../ZombieTZ-clean
+          BUNDLE_ABS="$(pwd)/$SOURCE_NAME"
+          git clone "$BUNDLE_ABS" ../ZombieTZ-clean
           cd ../ZombieTZ-clean
+          git bundle verify "$BUNDLE_ABS"
           test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
           git fsck --full
           test -f BiellaGames.uproject
